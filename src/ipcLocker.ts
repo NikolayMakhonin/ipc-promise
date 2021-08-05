@@ -10,35 +10,68 @@ const ipcLockerPromiseId = 'ipcLocker-687867bc-7339-46fe-8061-508a0284f49a'
 
 const lockers = new Map<string, TLocker>()
 
-async function lockUnlock({
-	lockerId,
-	lock,
-}: {
-	lockerId: string,
-	lock: boolean,
-}) {
-	let locker = lockers.get(lockerId)
-	if (!lock) {
-		if (locker) {
-			lockers.delete(lockerId)
-			locker.resolve()
+function unlock(lockerId: string) {
+	const locker = lockers.get(lockerId)
+	if (locker) {
+		locker.resolve()
+	}
+	return lockerId
+}
+
+async function lock(signal: AbortSignal, lockerId: string): Promise<string> {
+	const signalPromise = !signal.aborted && new Promise(resolve => {
+		signal.addEventListener('abort', resolve)
+	})
+
+	while (!signal.aborted) {
+		const locker = lockers.get(lockerId)
+
+		if (!locker) {
+			break
 		}
-		return
+
+		// eslint-disable-next-line no-await-in-loop
+		await Promise.race([
+			locker.promise,
+			signalPromise,
+		])
 	}
 
-	if (locker) {
-		await locker.promise
+	if (signal.aborted) {
+		return lockerId
 	}
 
 	let resolve
-	const promise = new Promise<void>(o => {
-		resolve = o
-	})
-	locker = {
+	const promise = Promise.race([
+		new Promise<void>(o => {
+			resolve = o
+		}),
+		signalPromise,
+	])
+		.then(() => {
+			lockers.delete(lockerId)
+		})
+
+	const locker = {
 		promise,
 		resolve,
 	}
 	lockers.set(lockerId, locker)
+
+	return lockerId
+}
+
+function lockUnlock(signal: AbortSignal, {
+	lockerId,
+	lock: _lock,
+}: {
+	lockerId: string,
+	lock: boolean,
+}): Promise<string>|string {
+	if (_lock) {
+		return lock(signal, lockerId)
+	}
+	return unlock(lockerId)
 }
 
 export function ipcLockerFactory(proc: TSubscribeSend) {
@@ -46,14 +79,14 @@ export function ipcLockerFactory(proc: TSubscribeSend) {
 }
 
 export function ipcLock(proc: TSubscribeSend, lockerId: string) {
-	return ipcPromiseCreate(proc, ipcLockerPromiseId + '-' + lockerId, {
+	return ipcPromiseCreate(proc, ipcLockerPromiseId, {
 		lockerId,
 		lock: true,
 	})
 }
 
 export function ipcUnlock(proc: TSubscribeSend, lockerId: string) {
-	return ipcPromiseCreate(proc, ipcLockerPromiseId + '-' + lockerId, {
+	return ipcPromiseCreate(proc, ipcLockerPromiseId, {
 		lockerId,
 		lock: false,
 	})

@@ -1,6 +1,7 @@
 import {spawn} from 'child_process'
 import {ipcLockerFactory} from './ipcLocker'
 import path from 'path'
+import assert from 'assert'
 
 describe('ipcLocker', function () {
 	this.timeout(6000000)
@@ -12,7 +13,7 @@ describe('ipcLocker', function () {
 			[lockId: string]: number
 		} = {}
 
-		const procIds = [1, 2, 3, 4, 5]
+		const procIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
 		type TResult = {
 			procId: number,
@@ -34,10 +35,12 @@ describe('ipcLocker', function () {
 				stdio: ['ipc', 'inherit', 'inherit']
 			})
 
+			let killed = false
+
 			const procPromise = new Promise((resolve, reject) => {
 				proc.on('exit', (code) => {
 					const log = `procId=${procId} exit ${code}`
-					if (code === 0) {
+					if (killed || code === 0) {
 						console.log(log)
 						resolve(void 0)
 					} else {
@@ -63,7 +66,6 @@ describe('ipcLocker', function () {
 								lockId: event.lockId,
 								lock: true,
 							}
-							results.push(result)
 							break
 						case 'ipcPromise-test-unlock':
 							if (locks[event.lockId] == null) {
@@ -77,6 +79,10 @@ describe('ipcLocker', function () {
 								lock: false,
 							}
 							break
+						case 'ipcPromise-test-killme':
+							killed = true
+							process.kill(proc.pid, 'SIGKILL')
+							return
 						case 'ipcPromise-test-error':
 							reject(event.error)
 							return
@@ -95,8 +101,29 @@ describe('ipcLocker', function () {
 			])
 		}))
 
-		console.log(results.map(resultToString).join('\r\n'))
-
 		console.log('End')
+
+		const resultsSorted = results.slice().sort((o1, o2) => {
+			if (o1.procId !== o2.procId) {
+				return o1.procId > o2.procId ? 1 : -1
+			}
+			if (o1.lockId !== o2.lockId) {
+				return o1.lockId > o2.lockId ? 1 : -1
+			}
+			return 0
+		})
+
+		const lockIds = [1, 2, 3, 4, 5]
+
+		const resultsCheck = procIds.flatMap(procId => {
+			return lockIds.flatMap(lockId => [
+				{procId, lockId, lock: true},
+				{procId, lockId, lock: false},
+			])
+		})
+
+		assert.deepStrictEqual(resultsSorted, resultsCheck)
+
+		// console.log(results.map(resultToString).join('\r\n'))
 	})
 })
