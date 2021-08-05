@@ -1,5 +1,5 @@
 import {spawn} from 'child_process'
-import {ipcLock, ipcLockerFactory, ipcUnlock} from './ipcLocker'
+import {ipcLock, ipcLockerFactory, ipcUnlock, lock, unlock} from './ipcLocker'
 import path from 'path'
 import assert from 'assert'
 import {delay} from './delay'
@@ -64,11 +64,16 @@ describe('ipcLocker', function () {
 		ipcLockerFactory(process)
 
 		const currentProcessPromise = Promise.all(lockIds.map(async (lockId) => {
-			await ipcLock(process, 'lock' + lockId)
+			const abortController = new AbortController()
+			await lock('lock' + lockId, abortController.signal)
 			onLock(0, lockId)
 			await delay(Math.random() * 250 + 250)
 			onUnlock(0, lockId)
-			await ipcUnlock(process, 'lock' + lockId)
+			if (lockId % 2 === 0) {
+				await unlock('lock' + lockId)
+			} else {
+				abortController.abort()
+			}
 		}))
 
 		await Promise.all(procIds.map(procId => {
