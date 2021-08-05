@@ -50,6 +50,7 @@ export async function lock(lockerId: string, signal?: AbortSignal): Promise<stri
 		signalPromise,
 	])
 		.then(() => {
+			console.log('IPC Unlock: ' + lockerId)
 			lockers.delete(lockerId)
 		})
 
@@ -58,6 +59,8 @@ export async function lock(lockerId: string, signal?: AbortSignal): Promise<stri
 		resolve,
 	}
 	lockers.set(lockerId, locker)
+
+	console.log('IPC Lock: ' + lockerId)
 
 	return lockerId
 }

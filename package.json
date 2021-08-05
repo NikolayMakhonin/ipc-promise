@@ -1,6 +1,6 @@
 {
 	"name": "@flemist/ipc-promise",
-	"version": "0.0.3",
+	"version": "0.0.4",
 	"description": "Promises for child processes",
 	"author": {
 		"name": "Nikolay Makhonin",
