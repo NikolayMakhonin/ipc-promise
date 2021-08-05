@@ -1,6 +1,6 @@
 {
 	"name": "@flemist/ipc-promise",
-	"version": "0.0.1",
+	"version": "0.0.2",
 	"description": "Promises for child processes",
 	"author": {
 		"name": "Nikolay Makhonin",
@@ -37,6 +37,7 @@
 	"scripts": {
 		"prepublishOnly": "npm run ci",
 		"lint": "eslint \"./src/**/*.ts\"",
+		"lint:fix": "eslint \"./src/**/*.ts\" --fix",
 		"build": "shx rm -rf dist && tsc",
 		"test": "shx rm -rf tmp && mocha ./dist/**/*.test.js",
 		"test:watch": "mocha --require ts-node/register ./src/**/*.test.ts --watch",

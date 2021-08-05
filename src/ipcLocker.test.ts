@@ -60,6 +60,8 @@ describe('ipcLocker', function () {
 		}
 
 		ipcLockerFactory(process)
+		ipcLockerFactory(process)
+		ipcLockerFactory(process)
 
 		const currentProcessPromise = Promise.all(lockIds.map(async (lockId) => {
 			await ipcLock(process, 'lock' + lockId)
@@ -94,6 +96,8 @@ describe('ipcLocker', function () {
 					}
 				})
 				proc.on('error', reject)
+				ipcLockerFactory(proc)
+				ipcLockerFactory(proc)
 				ipcLockerFactory(proc)
 			})
 

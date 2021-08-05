@@ -75,7 +75,7 @@ function lockUnlock(signal: AbortSignal, {
 }
 
 export function ipcLockerFactory(proc: TProcess) {
-	ipcPromiseFactory(proc, ipcLockerPromiseId, lockUnlock)
+	ipcPromiseFactory(proc, ipcLockerPromiseId, lockUnlock, false)
 }
 
 export function ipcLock(proc: TProcess, lockerId: string) {
@@ -86,6 +86,9 @@ export function ipcLock(proc: TProcess, lockerId: string) {
 }
 
 export function ipcUnlock(proc: TProcess, lockerId: string) {
+	if (proc === process) {
+		// ipcLockerFactory(process, false)
+	}
 	return ipcPromiseCreate(proc, ipcLockerPromiseId, {
 		lockerId,
 		lock: false,

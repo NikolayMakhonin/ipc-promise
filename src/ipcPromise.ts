@@ -93,6 +93,7 @@ export function ipcPromiseFactory<TArgs extends any[], TValue>(
 	proc: TProcess,
 	promiseTypeId: string,
 	factory: TPromiseFactory<TArgs, TValue>,
+	throwIfAlreadyCreated?: boolean,
 ) {
 	let factories = promiseFactories.get(proc)
 	if (!factories) {
@@ -100,7 +101,10 @@ export function ipcPromiseFactory<TArgs extends any[], TValue>(
 		promiseFactories.set(proc, factories)
 	}
 	if (factories.has(promiseTypeId)) {
-		throw new Error(`ipcPromiseFactory pid="${proc.pid}" "${promiseTypeId}" already created`)
+		if (throwIfAlreadyCreated) {
+			throw new Error(`ipcPromiseFactory pid="${proc.pid}" "${promiseTypeId}" already created`)
+		}
+		return
 	}
 
 	factories.set(promiseTypeId, factory)
