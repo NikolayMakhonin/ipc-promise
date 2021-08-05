@@ -16,3 +16,7 @@ export type TSend = {
 }
 
 export type TSubscribeSend = TSubscribe & TSend
+
+export type TProcess = TSubscribeSend & {
+	pid?: number,
+}

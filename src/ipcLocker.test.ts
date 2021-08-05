@@ -1,7 +1,8 @@
 import {spawn} from 'child_process'
-import {ipcLockerFactory} from './ipcLocker'
+import {ipcLock, ipcLockerFactory, ipcUnlock} from './ipcLocker'
 import path from 'path'
 import assert from 'assert'
+import {delay} from './delay'
 
 describe('ipcLocker', function () {
 	this.timeout(6000000)
@@ -13,7 +14,8 @@ describe('ipcLocker', function () {
 			[lockId: string]: number
 		} = {}
 
-		const procIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+		const procIds = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+		const lockIds = [1, 2, 3, 4, 5]
 
 		type TResult = {
 			procId: number,
@@ -27,7 +29,51 @@ describe('ipcLocker', function () {
 			return `procId=${result.procId} lockId=${result.lockId} ${result.lock ? 'lock' : 'unlock'}`
 		}
 
+		function onLock(procId: number, lockId: number) {
+			if (locks[lockId] != null) {
+				throw new Error(`locks[${lockId}] == ${locks[lockId]}`)
+			}
+			locks[lockId] = procId
+			const result: TResult = {
+				procId,
+				lockId: lockId,
+				lock: true,
+			}
+
+			results.push(result)
+			console.log(resultToString(result))
+		}
+
+		function onUnlock(procId: number, lockId: number) {
+			if (locks[lockId] == null) {
+				throw new Error(`locks[${lockId}] == null`)
+			}
+			locks[lockId] = null
+			const result: TResult = {
+				procId,
+				lockId: lockId,
+				lock: false,
+			}
+
+			results.push(result)
+			console.log(resultToString(result))
+		}
+
+		ipcLockerFactory(process)
+
+		const currentProcessPromise = Promise.all(lockIds.map(async (lockId) => {
+			await ipcLock(process, 'lock' + lockId)
+			onLock(0, lockId)
+			await delay(Math.random() * 250 + 250)
+			onUnlock(0, lockId)
+			await ipcUnlock(process, 'lock' + lockId)
+		}))
+
 		await Promise.all(procIds.map(procId => {
+			if (procId === 0) {
+				return currentProcessPromise
+			}
+
 			const proc = spawn('node', [
 				path.resolve(__dirname, '../dist/ipcLocker-test.js'),
 				procId.toString(),
@@ -53,45 +99,25 @@ describe('ipcLocker', function () {
 
 			const testPromise = new Promise((resolve, reject) => {
 				proc.on('message', (event: any) => {
-					let result: TResult
-					switch (event && event.type as string) {
-						case 'ipcPromise-test-lock':
-							if (locks[event.lockId] != null) {
-								reject(new Error(`locks[${event.lockId}] == ${locks[event.lockId]}`))
-								return
-							}
-							locks[event.lockId] = event.procId
-							result = {
-								procId,
-								lockId: event.lockId,
-								lock: true,
-							}
-							break
-						case 'ipcPromise-test-unlock':
-							if (locks[event.lockId] == null) {
-								reject(new Error(`locks[${event.lockId}] == null`))
-								return
-							}
-							locks[event.lockId] = null
-							result = {
-								procId,
-								lockId: event.lockId,
-								lock: false,
-							}
-							break
-						case 'ipcPromise-test-killme':
-							killed = true
-							process.kill(proc.pid, 'SIGKILL')
-							return
-						case 'ipcPromise-test-error':
-							reject(event.error)
-							return
-						default:
-							return
+					try {
+						switch (event && event.type as string) {
+							case 'ipcPromise-test-lock':
+								onLock(procId, event.lockId)
+								break
+							case 'ipcPromise-test-unlock':
+								onUnlock(procId, event.lockId)
+								break
+							case 'ipcPromise-test-killme':
+								killed = true
+								process.kill(proc.pid, 'SIGKILL')
+								break
+							case 'ipcPromise-test-error':
+								reject(event.error)
+								break
+						}
+					} catch (err) {
+						reject(err)
 					}
-
-					results.push(result)
-					console.log(resultToString(result))
 				})
 			})
 
@@ -112,8 +138,6 @@ describe('ipcLocker', function () {
 			}
 			return 0
 		})
-
-		const lockIds = [1, 2, 3, 4, 5]
 
 		const resultsCheck = procIds.flatMap(procId => {
 			return lockIds.flatMap(lockId => [

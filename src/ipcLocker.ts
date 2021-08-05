@@ -1,4 +1,4 @@
-import {TSubscribeSend} from './contracts'
+import {TProcess} from './contracts'
 import {ipcPromiseCreate, ipcPromiseFactory} from './ipcPromise'
 
 type TLocker = {
@@ -74,18 +74,18 @@ function lockUnlock(signal: AbortSignal, {
 	return unlock(lockerId)
 }
 
-export function ipcLockerFactory(proc: TSubscribeSend) {
+export function ipcLockerFactory(proc: TProcess) {
 	ipcPromiseFactory(proc, ipcLockerPromiseId, lockUnlock)
 }
 
-export function ipcLock(proc: TSubscribeSend, lockerId: string) {
+export function ipcLock(proc: TProcess, lockerId: string) {
 	return ipcPromiseCreate(proc, ipcLockerPromiseId, {
 		lockerId,
 		lock: true,
 	})
 }
 
-export function ipcUnlock(proc: TSubscribeSend, lockerId: string) {
+export function ipcUnlock(proc: TProcess, lockerId: string) {
 	return ipcPromiseCreate(proc, ipcLockerPromiseId, {
 		lockerId,
 		lock: false,

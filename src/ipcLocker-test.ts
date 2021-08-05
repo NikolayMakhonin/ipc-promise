@@ -13,7 +13,7 @@ Promise.all(lockIds.map(async (lockId, index) => {
 		procId,
 		lockId,
 	})
-	await delay(500)
+	await delay(Math.random() * 250 + 250)
 	process.send({
 		type: 'ipcPromise-test-unlock',
 		procId,

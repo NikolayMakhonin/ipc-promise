@@ -1,7 +1,7 @@
 import {Serializable} from 'child_process'
 import {
+	TProcess,
 	TSend,
-	TSubscribeSend,
 } from './contracts'
 import {off, on, once, send} from './helpers'
 import { AbortController } from 'node-abort-controller'
@@ -35,11 +35,25 @@ function sendIpcPromiseEvent(
 	} as TIpcPromiseEvent)
 }
 
+export type TPromiseFactory<TArgs extends any[], TValue>
+	= (signal: AbortSignal, ...args: TArgs) => Promise<TValue>|TValue
+
+const promiseFactories = new Map<TProcess, Map<string, TPromiseFactory<any, any>>>()
+
 function getNewPromiseId() {
 	return process.pid + '-' + Date.now().toString(36) + '-' + Math.random().toString(36)
 }
 
-export function ipcPromiseCreate(proc: TSubscribeSend, promiseTypeId: string, ...args: any[]) {
+export function ipcPromiseCreate(proc: TProcess, promiseTypeId: string, ...args: any[]) {
+	const factories = promiseFactories.get(proc)
+	if (factories) {
+		const factory = factories.get(promiseTypeId)
+		if (factory) {
+			// if ipcPromiseCreate ran in the same process as ipcPromiseFactory
+			return factory(new AbortController().signal, ...args)
+		}
+	}
+
 	return new Promise<void>((resolve, reject) => {
 		const promiseId = getNewPromiseId()
 
@@ -76,10 +90,21 @@ export function ipcPromiseReject(proc: TSend, promiseTypeId: string, promiseId: 
 }
 
 export function ipcPromiseFactory<TArgs extends any[], TValue>(
-	proc: TSubscribeSend,
+	proc: TProcess,
 	promiseTypeId: string,
-	factory: (signal: AbortSignal, ...args: TArgs) => Promise<TValue>|TValue,
+	factory: TPromiseFactory<TArgs, TValue>,
 ) {
+	let factories = promiseFactories.get(proc)
+	if (!factories) {
+		factories = new Map()
+		promiseFactories.set(proc, factories)
+	}
+	if (factories.has(promiseTypeId)) {
+		throw new Error(`ipcPromiseFactory pid="${proc.pid}" "${promiseTypeId}" already created`)
+	}
+
+	factories.set(promiseTypeId, factory)
+
 	const listener = async (event: TIpcPromiseEvent) => {
 		const { promiseId, value: args } = event
 		const abortController = new AbortController()
