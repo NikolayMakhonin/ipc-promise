@@ -3,6 +3,7 @@ import {ipcLock, ipcLockerFactory, ipcUnlock, lock, unlock} from './ipcLocker'
 import path from 'path'
 import assert from 'assert'
 import {delay} from './delay'
+import { AbortController } from 'node-abort-controller'
 
 describe('ipcLocker', function () {
 	this.timeout(6000000)
