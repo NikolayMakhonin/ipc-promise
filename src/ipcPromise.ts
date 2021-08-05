@@ -81,11 +81,11 @@ export function ipcPromiseCreate(proc: TProcess, promiseTypeId: string, ...args:
 	})
 }
 
-export function ipcPromiseResolve(proc: TSend, promiseTypeId: string, promiseId: string, value: any) {
+function ipcPromiseResolve(proc: TSend, promiseTypeId: string, promiseId: string, value: any) {
 	return sendIpcPromiseEvent(proc, promiseTypeId, promiseId, 'resolve', value)
 }
 
-export function ipcPromiseReject(proc: TSend, promiseTypeId: string, promiseId: string, error: any) {
+function ipcPromiseReject(proc: TSend, promiseTypeId: string, promiseId: string, error: any) {
 	return sendIpcPromiseEvent(proc, promiseTypeId, promiseId, 'reject', error)
 }
 
