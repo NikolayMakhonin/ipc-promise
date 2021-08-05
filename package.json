@@ -1,0 +1,61 @@
+{
+	"name": "@flemist/ipc-promise",
+	"version": "0.0.1",
+	"description": "Promises for child processes",
+	"author": {
+		"name": "Nikolay Makhonin",
+		"url": "https://github.com/NikolayMakhonin/"
+	},
+	"homepage": "https://github.com/NikolayMakhonin/ipc-promise/",
+	"bugs": {
+		"url": "https://github.com/NikolayMakhonin/ipc-promise/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+ssh://git@github.com:NikolayMakhonin/ipc-promise.git"
+	},
+	"license": "CC0-1.0",
+	"keywords": [
+		"crossplatform",
+		"cross-platform",
+		"ps",
+		"wmic",
+		"processlist",
+		"process-list"
+	],
+	"files": [
+		"dist/**"
+	],
+	"types": "dist/index.d.ts",
+	"main": "dist/index.js",
+	"engines": {
+		"node": ">= 12"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"prepublishOnly": "npm run ci",
+		"lint": "eslint \"./src/**/*.ts\"",
+		"build": "shx rm -rf dist && tsc",
+		"test": "shx rm -rf tmp && mocha ./dist/**/*.test.js",
+		"test:watch": "mocha --require ts-node/register ./src/**/*.test.ts --watch",
+		"ci": "npm i && npm run lint && npm run build && npm run test"
+	},
+	"devDependencies": {
+		"@types/assert": "^1.5.5",
+		"@types/mocha": "^8.2.3",
+		"@types/node": "^16.3.3",
+		"@typescript-eslint/eslint-plugin": "^4.13.0",
+		"@typescript-eslint/parser": "^4.13.0",
+		"@flemist/ps-cross-platform": "0.0.12",
+		"assert": "^2.0.0",
+		"eslint": "^7.18.0",
+		"eslint-config-pro": "^2.1.1",
+		"eslint-plugin-sonarjs": "^0.9.1",
+		"mocha": "^9.0.2",
+		"shx": "^0.3.3",
+		"ts-node": "^10.1.0",
+		"typescript": "^4.3.5"
+	}
+}
