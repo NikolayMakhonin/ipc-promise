@@ -1,92 +1,82 @@
 import {Serializable} from 'child_process'
 import {
-  TSubscribe,
-  TSend,
-  EVENT_TYPE_IPC_PROMISE,
-  TIpcPromiseEvent,
-  TIpcPromiseAction,
-  TEventEmitter,
+	TSend,
+	TSubscribeSend,
 } from './contracts'
+import {off, once, send} from './helpers'
 
-// region types
+type TIpcPromiseType = 'ipcPromise-2e07c32b-b7df-474f-89f7-dab809382670'
+const EVENT_TYPE_IPC_PROMISE: TIpcPromiseType = 'ipcPromise-2e07c32b-b7df-474f-89f7-dab809382670'
 
-// endregion
+type TIpcPromiseAction = 'create' | 'resolve' | 'reject'
 
-// region helpers
-
-function on(proc: TSubscribe, event: string | symbol, listener: (...args: any[]) => void) {
-  const _on = proc.addListener || proc.on
-  _on.call(proc, 'message', listener)
+type TIpcPromiseEvent = {
+	type: TIpcPromiseType,
+	id: string,
+	action: TIpcPromiseAction,
+	value?: any,
 }
 
-function off(proc: TSubscribe, event: string | symbol, listener: (...args: any[]) => void) {
-  const _off = proc.removeListener || proc.off
-  _off.call(proc, 'message', listener)
+function sendIpcPromiseEvent(proc: TSend, promiseId: string, action: TIpcPromiseAction, value: Serializable) {
+	return send(proc, {
+		type: EVENT_TYPE_IPC_PROMISE,
+		id  : promiseId,
+		action,
+		value,
+	} as TIpcPromiseEvent)
 }
 
-function send(proc: TSend, message: Serializable) {
-  return new Promise<void>((resolve, reject) => {
-    if ('send' in proc) {
-      proc.send(message, null, {}, (err) => {
-        if (err) {
-          reject(err)
-          return
-        }
-        resolve(void 0)
-      })
-    } else {
-      proc.emit('message', message)
-      resolve(void 0)
-    }
-  })
+export function ipcPromiseCreate(proc: TSubscribeSend, promiseId: string, arg: any) {
+	return new Promise<void>((resolve, reject) => {
+		const listener = (event: TIpcPromiseEvent) => {
+			if (event.action === 'resolve') {
+				resolve(event.value)
+			} else {
+				reject(event.value)
+			}
+		}
+
+		once(proc, 'message', listener, event => {
+			return event
+				&& event.type === EVENT_TYPE_IPC_PROMISE
+				&& event.id === promiseId
+				&& (event.action === 'resolve' || event.action === 'reject')
+		})
+
+		sendIpcPromiseEvent(proc, promiseId, 'create', arg)
+			.catch(err => {
+				off(proc, 'message', listener)
+				reject(err)
+			})
+	})
 }
 
-function sendIpcPromiseEvent(proc: TSend, promiseId: string, action: TIpcPromiseAction, value?: Serializable) {
-  return send(proc, {
-    type: EVENT_TYPE_IPC_PROMISE,
-    id  : promiseId,
-    action,
-    value,
-  } as TIpcPromiseEvent)
+export function ipcPromiseResolve(proc: TSend, promiseId: string, value: any) {
+	return sendIpcPromiseEvent(proc, promiseId, 'resolve', value)
 }
 
-// endregion
-
-// region actions
-
-export function createIpcPromise(proc: TEventEmitter, promiseId: string) {
-  return new Promise<void>((resolve, reject) => {
-    const listener = (event: TIpcPromiseEvent) => {
-      if (
-        event
-        && event.type === EVENT_TYPE_IPC_PROMISE
-        && event.id === promiseId
-      ) {
-        off(proc, 'message', listener)
-        if (event.action === 'reject') {
-          reject(event.value)
-        } else if (event.action === 'resolve') {
-          resolve(event.value)
-        } else {
-          console.error('Unknown event.action: ' + event.action)
-        }
-      }
-    }
-    on(proc, 'message', listener)
-    sendIpcPromiseEvent(proc, promiseId, 'create')
-      .catch(err => {
-        off(proc, 'message', listener)
-        reject(err)
-      })
-  })
+export function ipcPromiseReject(proc: TSend, promiseId: string, error: any) {
+	return sendIpcPromiseEvent(proc, promiseId, 'reject', error)
 }
 
-export function resolveIpcPromise(proc: TSend, promiseId: string, value: any) {
-  return sendIpcPromiseEvent(proc, promiseId, 'resolve', value)
-}
+export function ipcPromiseFactory<TArg, TValue>(
+	proc: TSubscribeSend,
+	promiseId: string,
+	factory: (arg: TArg) => Promise<TValue>|TValue,
+) {
+	const listener = async (event: TIpcPromiseEvent) => {
+		try {
+			const value = await factory(event.value)
+			ipcPromiseResolve(proc, promiseId, value)
+		} catch (err) {
+			ipcPromiseReject(proc, promiseId, err)
+		}
+	}
 
-export function rejectIpcPromise(proc: TSend, promiseId: string, error: any) {
-  return sendIpcPromiseEvent(proc, promiseId, 'reject', error)
+	once(proc, 'message', listener, event => {
+		return event
+			&& event.type === EVENT_TYPE_IPC_PROMISE
+			&& event.id === promiseId
+			&& event.action === 'create'
+	})
 }
-
-// endregion
